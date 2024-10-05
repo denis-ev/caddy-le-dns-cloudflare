@@ -1,0 +1,18 @@
+services:
+  caddy:
+    container_name: caddy
+    image: ghcr.io/denis-ev/caddy-le-dns-cloudflare:latest
+    volumes:
+      - /path/to/Caddyfile:/etc/caddy/Caddyfile
+    ports:
+      - 80:80
+      - 443:443
+    networks:
+      - proxy
+    restart: unless-stopped
+    environment:
+      - CF_API_TOKEN=<GLOBAL API TOKEN>
+
+networks:
+  proxy:
+    external: true
