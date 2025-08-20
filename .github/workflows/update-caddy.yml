@@ -8,53 +8,34 @@ on:
 jobs:
   check_caddy_release:
     runs-on: ubuntu-latest
-    outputs:
-      new_version: ${{ steps.check.outputs.new_version }}
-      has_update: ${{ steps.check.outputs.has_update }}
+    permissions:
+      contents: write
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Get current version
         id: current
         run: echo "version=$(cat CADDY_VERSION)" >> $GITHUB_OUTPUT
 
-      - name: Fetch latest Caddy release
+      - name: Fetch latest release
         id: latest
         run: |
           latest=$(curl -s https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r .tag_name | sed 's/^v//')
           echo "latest=$latest" >> $GITHUB_OUTPUT
 
-      - name: Compare versions
-        id: check
+      - name: Update CADDY_VERSION
+        if: ${{ steps.latest.outputs.latest != steps.current.outputs.version }}
         run: |
-          if [ "${{ steps.latest.outputs.latest }}" != "${{ steps.current.outputs.version }}" ]; then
-            echo "has_update=true" >> $GITHUB_OUTPUT
-            echo "new_version=${{ steps.latest.outputs.latest }}" >> $GITHUB_OUTPUT
-          else
-            echo "has_update=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Update repo and push branch
-        if: ${{ steps.check.outputs.has_update == 'true' }}
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          commit-message: "chore: bump caddy to v${{ steps.check.outputs.new_version }}"
-          branch: bump-caddy-${{ steps.check.outputs.new_version }}
-          title: "chore: bump Caddy to v${{ steps.check.outputs.new_version }}"
-          body: |
-            Detected new upstream Caddy v${{ steps.check.outputs.new_version }}.
-            This PR updates **CADDY_VERSION** and Dockerfile accordingly.
-          labels: dependencies
+          echo "${{ steps.latest.outputs.latest }}" > CADDY_VERSION
 
       - name: Create Pull Request
-        if: ${{ steps.check.outputs.has_update == 'true' }}
+        if: ${{ steps.latest.outputs.latest != steps.current.outputs.version }}
         uses: peter-evans/create-pull-request@v5
         with:
-          branch: bump-caddy-${{ steps.check.outputs.new_version }}
-          title: "Update Caddy to v${{ steps.check.outputs.new_version }}"
-          commit-message: "chore: bump caddy to v${{ steps.check.outputs.new_version }}"
+          commit-message: "chore: bump caddy to v${{ steps.latest.outputs.latest }}"
+          branch: bump-caddy-${{ steps.latest.outputs.latest }}
+          title: "Update Caddy to v${{ steps.latest.outputs.latest }}"
           body: |
-            Auto-generated PR: bump base image to upstream Caddy v${{ steps.check.outputs.new_version }}
+            Auto-generated PR: bump base image to upstream Caddy v${{ steps.latest.outputs.latest }}
           labels: dependencies
+          signoff: false
