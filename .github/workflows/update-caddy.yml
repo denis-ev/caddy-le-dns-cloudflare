@@ -37,14 +37,16 @@ jobs:
 
       - name: Update repo and push branch
         if: ${{ steps.check.outputs.has_update == 'true' }}
-        run: |
-          echo "${{ steps.check.outputs.new_version }}" > CADDY_VERSION
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git checkout -b bump-caddy-${{ steps.check.outputs.new_version }}
-          git add CADDY_VERSION Dockerfile
-          git commit -m "chore: bump caddy to v${{ steps.check.outputs.new_version }}"
-          git push origin bump-caddy-${{ steps.check.outputs.new_version }}
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: bump caddy to v${{ steps.check.outputs.new_version }}"
+          branch: bump-caddy-${{ steps.check.outputs.new_version }}
+          title: "chore: bump Caddy to v${{ steps.check.outputs.new_version }}"
+          body: |
+            Detected new upstream Caddy v${{ steps.check.outputs.new_version }}.
+            This PR updates **CADDY_VERSION** and Dockerfile accordingly.
+          labels: dependencies
 
       - name: Create Pull Request
         if: ${{ steps.check.outputs.has_update == 'true' }}
