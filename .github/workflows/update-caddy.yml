@@ -1,42 +1,38 @@
-name: Check Upstream Caddy Release and Rebuild
+name: Update Caddy Version
 
 on:
   schedule:
     - cron: '0 7 * * *'   # check daily at 07:00 UTC
-  workflow_dispatch:       # allow manual trigger
+  workflow_dispatch:       # can also be triggered manually from the Actions tab
 
 jobs:
-  check_caddy_release:
+  update-caddy:
     runs-on: ubuntu-latest
     permissions:
-      contents: write       # allows commits & pushes
-      pull-requests: write  # allows creating PRs
+      contents: write    # allow committing and pushing to the repo
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
       - name: Get current version
         id: current
         run: echo "version=$(cat CADDY_VERSION)" >> $GITHUB_OUTPUT
 
-      - name: Fetch latest release
+      - name: Fetch latest Caddy release
         id: latest
         run: |
-          latest=$(curl -s https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r .tag_name | sed 's/^v//')
+          latest=$(curl -s https://api.github.com/repos/caddyserver/caddy/releases/latest \
+            | jq -r .tag_name | sed 's/^v//')
           echo "latest=$latest" >> $GITHUB_OUTPUT
 
-      - name: Update CADDY_VERSION
+      - name: Update CADDY_VERSION file
+        if: ${{ steps.latest.outputs.latest != steps.current.outputs.version }}
+        run: echo "${{ steps.latest.outputs.latest }}" > CADDY_VERSION
+
+      - name: Commit and push changes
         if: ${{ steps.latest.outputs.latest != steps.current.outputs.version }}
         run: |
-          echo "${{ steps.latest.outputs.latest }}" > CADDY_VERSION
-
-      - name: Create Pull Request
-        if: ${{ steps.latest.outputs.latest != steps.current.outputs.version }}
-        uses: peter-evans/create-pull-request@v5
-        with:
-          commit-message: "chore: bump caddy to v${{ steps.latest.outputs.latest }}"
-          branch: bump-caddy-${{ steps.latest.outputs.latest }}
-          title: "Update Caddy to v${{ steps.latest.outputs.latest }}"
-          body: |
-            Auto-generated PR: bump base image to upstream Caddy v${{ steps.latest.outputs.latest }}
-          labels: dependencies
-          signoff: false
+          git add CADDY_VERSION
+          git commit -m "chore: bump Caddy to v${{ steps.latest.outputs.latest }}"
+          git push origin HEAD:main
