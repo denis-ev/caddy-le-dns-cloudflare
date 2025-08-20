@@ -1,0 +1,58 @@
+name: Check Upstream Caddy Release and Rebuild
+
+on:
+  schedule:
+    - cron: '0 7 * * *'   # check daily at 07:00 UTC
+  workflow_dispatch:       # allow manual trigger
+
+jobs:
+  check_caddy_release:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.check.outputs.new_version }}
+      has_update: ${{ steps.check.outputs.has_update }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Get current version
+        id: current
+        run: echo "version=$(cat CADDY_VERSION)" >> $GITHUB_OUTPUT
+
+      - name: Fetch latest Caddy release
+        id: latest
+        run: |
+          latest=$(curl -s https://api.github.com/repos/caddyserver/caddy/releases/latest | jq -r .tag_name | sed 's/^v//')
+          echo "latest=$latest" >> $GITHUB_OUTPUT
+
+      - name: Compare versions
+        id: check
+        run: |
+          if [ "${{ steps.latest.outputs.latest }}" != "${{ steps.current.outputs.version }}" ]; then
+            echo "has_update=true" >> $GITHUB_OUTPUT
+            echo "new_version=${{ steps.latest.outputs.latest }}" >> $GITHUB_OUTPUT
+          else
+            echo "has_update=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Update repo and push branch
+        if: ${{ steps.check.outputs.has_update == 'true' }}
+        run: |
+          echo "${{ steps.check.outputs.new_version }}" > CADDY_VERSION
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b bump-caddy-${{ steps.check.outputs.new_version }}
+          git add CADDY_VERSION Dockerfile
+          git commit -m "chore: bump caddy to v${{ steps.check.outputs.new_version }}"
+          git push origin bump-caddy-${{ steps.check.outputs.new_version }}
+
+      - name: Create Pull Request
+        if: ${{ steps.check.outputs.has_update == 'true' }}
+        uses: peter-evans/create-pull-request@v5
+        with:
+          branch: bump-caddy-${{ steps.check.outputs.new_version }}
+          title: "Update Caddy to v${{ steps.check.outputs.new_version }}"
+          commit-message: "chore: bump caddy to v${{ steps.check.outputs.new_version }}"
+          body: |
+            Auto-generated PR: bump base image to upstream Caddy v${{ steps.check.outputs.new_version }}
+          labels: dependencies
