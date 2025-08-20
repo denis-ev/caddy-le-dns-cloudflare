@@ -33,8 +33,6 @@ jobs:
       - name: Commit and push changes
         if: ${{ steps.latest.outputs.latest != steps.current.outputs.version }}
         run: |
-        Configured git committer as 'GitHub <noreply@github.com>'
-  Configured git author as 'denis-ev <denis-ev@users.noreply.github.com>'
           git config user.name "denis-ev"
           git config user.email "denis-ev@users.noreply.github.com"
           git add CADDY_VERSION
