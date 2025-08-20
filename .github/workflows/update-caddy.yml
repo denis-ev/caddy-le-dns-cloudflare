@@ -9,7 +9,8 @@ jobs:
   check_caddy_release:
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: write       # allows commits & pushes
+      pull-requests: write  # allows creating PRs
     steps:
       - uses: actions/checkout@v4
 
